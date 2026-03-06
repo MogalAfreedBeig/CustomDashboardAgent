@@ -1,0 +1,15 @@
+{
+  "projects": {
+    "default": "grminnexus1"
+  },
+  "targets": {
+    "grminnexus1": {
+      "hosting": {
+        "customdashboard": [
+          "agent-customdashboard"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

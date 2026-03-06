@@ -1,0 +1,21 @@
+# Node modules
+node_modules/
+
+# Environment files
+.env
+.env.*
+
+# JSON files
+*.json
+
+# TypeScript files
+*.ts
+
+# Optional: ignore build artifacts
+dist/
+build/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
