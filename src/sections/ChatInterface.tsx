@@ -13,7 +13,7 @@ import {
 import { DataTable } from '../components/charts/DataTable';
 import { toast } from 'sonner';
 
-const API_URL = import.meta.env.VITE_API_URL || '/api/v1';
+const API_URL = import.meta.env.VITE_API_URL || '/apiv2/v1';
 
 export function ChatInterface() {
   const { messages, isLoading, sendMessage, currentConversationId } =

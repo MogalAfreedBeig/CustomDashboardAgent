@@ -6,10 +6,7 @@ node_modules/
 .env.*
 
 # JSON files
-*.json
-
-# TypeScript files
-*.ts
+key.json
 
 # Optional: ignore build artifacts
 dist/
