@@ -6,10 +6,13 @@
   "main": "server/dist/server/src/server.js",
   "scripts": {
     "dev:client": "vite",
+    "build:client": "vite build",
     "build:server": "tsc -p tsconfig.server.json",
-    "server:start": "npx nodemon server/dist/server/src/server.js",
-    "lint": "eslint .",
-    "preview": "vite preview"
+    "build": "npm run build:client && npm run build:server",
+    "start": "node server/dist/server/src/server.js",
+    "server:start": "nodemon server/dist/server/src/server.js",
+    "preview": "vite preview",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@azure/openai": "^2.0.0",

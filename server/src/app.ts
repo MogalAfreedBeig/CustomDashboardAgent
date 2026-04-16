@@ -63,7 +63,8 @@ app.use('/apiv2/v1', routes);
 /* ======================
    Serve Frontend (Vite build)
 ====================== */
-const distPath = path.resolve(__dirname, '../client');
+// const distPath = path.resolve(__dirname, '../client');
+const distPath = path.resolve(__dirname, '../../dist');
 
 app.use(express.static(distPath));
 
