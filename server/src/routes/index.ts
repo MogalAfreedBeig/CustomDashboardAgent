@@ -13,6 +13,7 @@ router.get('/health', (req, res) => {
 // Chat/Query routes
 router.post('/chat/query', chatController.executeQuery);
 router.get('/chat/conversations', chatController.getUserConversations);
+// router.get('/chat/conversations', chatController.getConversations);
 router.get('/chat/conversation/:conversationId', chatController.getConversation);
 router.delete('/chat/conversation/:conversationId', chatController.deleteConversation);
 

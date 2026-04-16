@@ -10,6 +10,7 @@ import {
   Moon,
   Sun,
   Monitor,
+  Trash2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -34,7 +35,10 @@ export function Sidebar({
     currentConversationId,
     loadConversation,
     clearMessages,
+    deleteConversation,
+    loadConversations
   } = useChatStore();
+
   const { theme, setTheme } = useThemeStore();
 
   const handleNewChat = () => {
@@ -70,7 +74,7 @@ export function Sidebar({
           </div>
           {isOpen && (
             <div>
-              <h1 className='font-semibold text-sm'>Campaign Analytics</h1>
+              <h1 className='font-semibold text-sm'>Analytics Bot</h1>
               <p className='text-xs text-muted-foreground'>
                 AI-Powered Insights
               </p>
@@ -102,19 +106,19 @@ export function Sidebar({
                 : 'hover:bg-muted text-muted-foreground'
             }`}
           >
-            <MessageSquare size={18} className='flex-shrink-0' />
+            <MessageSquare size={18} />
             {isOpen && <span>Chat</span>}
           </button>
 
           <button
-            onClick={() => handleNavigate()}
+            onClick={handleNavigate}
             className={`w-full flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
               activeView === 'dashboard'
                 ? 'bg-primary/10 text-primary'
                 : 'hover:bg-muted text-muted-foreground'
             }`}
           >
-            <LayoutDashboard size={18} className='flex-shrink-0' />
+            <LayoutDashboard size={18} />
             {isOpen && <span>Dashboard</span>}
           </button>
         </nav>
@@ -129,23 +133,43 @@ export function Sidebar({
               Recent Chats
             </h3>
           </div>
+
           <ScrollArea className='h-[calc(100vh-350px)]'>
             <div className='px-3 space-y-1'>
               {conversations.map((conversation) => (
-                <button
+                <div
                   key={conversation.id}
-                  onClick={() => {
-                    loadConversation(conversation.id);
-                    onViewChange('chat');
-                  }}
-                  className={`w-full text-left px-3 py-2 rounded-md text-sm truncate transition-colors ${
+                  className={`flex items-center justify-between px-3 py-2 rounded-md text-sm transition-colors ${
                     currentConversationId === conversation.id
                       ? 'bg-primary/10 text-primary'
                       : 'hover:bg-muted text-muted-foreground'
                   }`}
                 >
-                  {conversation.title}
-                </button>
+                  {/* Conversation Title */}
+                  <button
+                    className="flex-1 min-w-0 text-left"
+                    onClick={() => {
+                      loadConversation(conversation.id);
+                      onViewChange('chat');
+                    }}
+                    title={conversation.title} // show full title on hover
+                  >
+                    {conversation.title.length > 25
+                      ? conversation.title.slice(0, 25) + '...'
+                      : conversation.title}
+                  </button>
+
+                  {/* Delete Button - Always Visible */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteConversation(conversation.id);
+                    }}
+                    className="ml-2 flex-shrink-0 text-red-500 hover:text-red-600"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
               ))}
             </div>
           </ScrollArea>
@@ -161,19 +185,31 @@ export function Sidebar({
             <div className='flex gap-1'>
               <button
                 onClick={() => setTheme('light')}
-                className={`p-1.5 rounded ${theme === 'light' ? 'bg-primary/20 text-primary' : 'text-muted-foreground'}`}
+                className={`p-1.5 rounded ${
+                  theme === 'light'
+                    ? 'bg-primary/20 text-primary'
+                    : 'text-muted-foreground'
+                }`}
               >
                 <Sun size={14} />
               </button>
               <button
                 onClick={() => setTheme('dark')}
-                className={`p-1.5 rounded ${theme === 'dark' ? 'bg-primary/20 text-primary' : 'text-muted-foreground'}`}
+                className={`p-1.5 rounded ${
+                  theme === 'dark'
+                    ? 'bg-primary/20 text-primary'
+                    : 'text-muted-foreground'
+                }`}
               >
                 <Moon size={14} />
               </button>
               <button
                 onClick={() => setTheme('system')}
-                className={`p-1.5 rounded ${theme === 'system' ? 'bg-primary/20 text-primary' : 'text-muted-foreground'}`}
+                className={`p-1.5 rounded ${
+                  theme === 'system'
+                    ? 'bg-primary/20 text-primary'
+                    : 'text-muted-foreground'
+                }`}
               >
                 <Monitor size={14} />
               </button>
@@ -196,7 +232,7 @@ export function Sidebar({
             isOpen ? '' : 'justify-center'
           }`}
         >
-          <Settings size={18} className='flex-shrink-0' />
+          <Settings size={18} />
           {isOpen && <span>Settings</span>}
         </button>
       </div>

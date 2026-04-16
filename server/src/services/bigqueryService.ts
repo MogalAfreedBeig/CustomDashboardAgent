@@ -167,6 +167,57 @@ class BigQueryService {
     }
   }
 
+  async getUserConversations(userId: string) {
+    // const query = `
+    //   SELECT
+    //     conversation_id as id,
+    //     ANY_VALUE(message) as title,
+    //     MAX(created_at) as updatedAt
+    //   FROM \`${this.projectId}.${this.datasetId}.chat_history\`
+    //   WHERE user_id = @userId
+    //   GROUP BY conversation_id
+    //   ORDER BY updatedAt DESC
+    // `;
+
+    const query = `
+      SELECT
+        conversation_id as id,
+        ANY_VALUE(message) as title,
+        MAX(created_at) as updatedAt
+      FROM \`${this.bigquery.projectId}.${this.datasetId}.chat_history\`
+      WHERE user_id = @userId
+      GROUP BY conversation_id
+      ORDER BY updatedAt DESC
+    `;
+
+    const [rows] = await this.bigquery.query({
+      query,
+      params: { userId },
+    });
+
+    return rows.map((r: any) => ({
+      id: r.id,
+      title: r.title,
+      updatedAt: r.updatedAt,
+    }));
+  }
+
+  async getConversationHistory(conversationId: string) {
+    const sql = `
+      SELECT *
+      FROM \`${this.bigquery.projectId}.${this.datasetId}.chat_history\`
+      WHERE conversation_id = @conversationId
+      ORDER BY created_at ASC
+    `;
+
+    const [rows] = await this.bigquery.query({
+      query: sql,
+      params: { conversationId },
+    });
+
+    return rows;
+  }
+
   /**
    * Infer table name from field name
    */
@@ -294,6 +345,128 @@ class BigQueryService {
     } catch (error) {
       console.error(`Failed to get schema for ${tableName}:`, error);
       throw error;
+    }
+  }
+
+  async deleteConversation(conversationId: string) {
+    const query = `
+      DELETE FROM \`${this.bigquery.projectId}.${this.datasetId}.chat_history\`
+      WHERE conversation_id = @conversationId
+    `;
+
+    await this.bigquery.query({
+      query,
+      params: { conversationId },
+      location: gcpConfig.bigquery.location,
+    });
+
+    return true;
+  }
+
+  //  to store the chat history
+  // async insertChatHistory(row: any) {
+  //   try {
+  //     console.log("\n===============================");
+  //     console.log("📥 Storing chat in BigQuery...");
+  //     console.log("Row:", JSON.stringify(row, null, 2));
+
+  //     const dataset = this.bigquery.dataset(this.datasetId);
+  //     const table = dataset.table("chat_history");
+
+  //     const response = await table.insert([row]);
+
+  //     console.log("✅ Chat stored successfully");
+  //     console.log("BigQuery response:", response);
+  //     console.log("===============================\n");
+
+  //   } catch (error: any) {
+  //     console.error("\n❌ Chat history insert error:");
+
+  //     if (error.name === "PartialFailureError") {
+  //       error.errors.forEach((e: any, index: number) => {
+  //         console.error(`Row ${index} error:`);
+  //         e.errors.forEach((detail: any) => {
+  //           console.error("Reason:", detail.reason);
+  //           console.error("Message:", detail.message);
+  //         });
+  //       });
+  //     } else {
+  //       console.error(error);
+  //     }
+
+  //     console.error("Row failed:", JSON.stringify(row, null, 2));
+  //     console.error("===============================\n");
+  //   }
+  // }
+
+  async insertChatHistory(message: {
+    conversation_id: string;
+    query_id?: string;
+    user_id?: string;
+    role: "user" | "assistant";
+    message: string;
+    sql?: string;
+    data?: any[];
+    columns?: any[];
+    visualization?: any;
+    insights?: string[];
+  }) {
+    try {
+      console.log("\n===============================");
+      console.log("📥 Storing chat in BigQuery...");
+
+      console.log("data isArray:", Array.isArray(message.data));
+      console.log("columns isArray:", Array.isArray(message.columns));
+      console.log("insights isArray:", Array.isArray(message.insights));
+
+      const row = {
+        conversation_id: message.conversation_id,
+        query_id: message.query_id || null,
+        user_id: message.user_id || "default",
+
+        role: message.role,
+        message: message.message,
+        sql: message.sql || null,
+
+        // 🔥 stringify JSON (required for BigQuery insert)
+        data: message.data ? JSON.stringify(message.data) : null,
+        columns: message.columns ? JSON.stringify(message.columns) : null,
+        visualization: message.visualization
+          ? JSON.stringify(message.visualization)
+          : null,
+        insights: message.insights
+          ? JSON.stringify(message.insights)
+          : null,
+
+        created_at: new Date().toISOString(),
+      };
+
+      console.log("Final Row:");
+      console.log(JSON.stringify(row, null, 2));
+
+      const dataset = this.bigquery.dataset(this.datasetId);
+      const table = dataset.table("chat_history");
+
+      await table.insert([row]);
+
+      console.log("✅ Chat stored successfully");
+      console.log("===============================\n");
+
+    } catch (error: any) {
+      console.error("\n❌ Chat history insert error:");
+
+      if (error.name === "PartialFailureError") {
+        error.errors.forEach((e: any) => {
+          e.errors.forEach((detail: any) => {
+            console.error("Reason:", detail.reason);
+            console.error("Message:", detail.message);
+          });
+        });
+      } else {
+        console.error(error);
+      }
+
+      console.error("===============================\n");
     }
   }
 

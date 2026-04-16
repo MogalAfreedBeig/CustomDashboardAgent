@@ -1,3 +1,4 @@
+// Added the auto scroll
 // Chat Interface - Main chat UI with message display and input
 import React, { useRef, useEffect, useState } from 'react';
 import { Send, Loader2, FileText, Presentation, Sparkles } from 'lucide-react';
@@ -16,22 +17,26 @@ import { toast } from 'sonner';
 const API_URL = import.meta.env.VITE_API_URL || '/apiv2/v1';
 
 export function ChatInterface() {
-  const { messages, isLoading, sendMessage, currentConversationId } =
+  const { messages, isLoading, sendMessage, currentConversationId, loadConversations } =
     useChatStore();
   const [input, setInput] = useState('');
-  const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // NEW: ref for auto-scroll
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   // Auto-scroll to bottom
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
 
   // Focus input on mount
   useEffect(() => {
     inputRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    loadConversations();
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -43,20 +48,74 @@ export function ChatInterface() {
     await sendMessage(message);
   };
 
+  // const handleExport = async (format: 'pdf' | 'ppt') => {
+  //   if (!currentConversationId) {
+  //     toast.error('No conversation to export');
+  //     return;
+  //   }
+
+  //   const lastMessage = messages[messages.length - 1];
+  //   if (!lastMessage?.queryResult) {
+  //     toast.error('No results to export');
+  //     return;
+  //   }
+
+  //   try {
+  //     toast.info(`Generating ${format.toUpperCase()}...`);
+
+  //     const response = await fetch(`${API_URL}/export/${format}`, {
+  //       method: 'POST',
+  //       headers: {
+  //         'Content-Type': 'application/json',
+  //         Authorization: `Bearer ${localStorage.getItem('token') || ''}`,
+  //       },
+  //       body: JSON.stringify({
+  //         query: messages[messages.length - 2]?.content || 'Query',
+  //         result: lastMessage.queryResult,
+  //         metadata: {
+  //           author: 'Analytics Bot Bot',
+  //           company: 'Your Company',
+  //         },
+  //       }),
+  //     });
+
+  //     if (!response.ok) throw new Error('Export failed');
+
+  //     const blob = await response.blob();
+  //     const url = window.URL.createObjectURL(blob);
+  //     const a = document.createElement('a');
+  //     a.href = url;
+  //     a.download = `report-${new Date().toISOString().split('T')[0]}.${format === 'pdf' ? 'pdf' : 'pptx'}`;
+  //     document.body.appendChild(a);
+  //     a.click();
+  //     window.URL.revokeObjectURL(url);
+  //     document.body.removeChild(a);
+
+  //     toast.success(`${format.toUpperCase()} exported successfully!`);
+  //   } catch (error) {
+  //     toast.error(`Failed to export ${format.toUpperCase()}`);
+  //   }
+  // };
+
   const handleExport = async (format: 'pdf' | 'ppt') => {
     if (!currentConversationId) {
       toast.error('No conversation to export');
       return;
     }
 
-    const lastMessage = messages[messages.length - 1];
-    if (!lastMessage?.queryResult) {
-      toast.error('No results to export');
+    console.log("EXPORT CLICKED");
+    console.log("MESSAGES COUNT:", messages.length);
+    console.log("MESSAGES:", messages);
+    console.log("LAST MESSAGE:", messages[messages.length - 1]);
+
+    if (!messages || messages.length === 0) {
+      toast.error('No messages to export');
       return;
     }
 
     try {
       toast.info(`Generating ${format.toUpperCase()}...`);
+      console.log("EXPORT messages:", messages);
 
       const response = await fetch(`${API_URL}/export/${format}`, {
         method: 'POST',
@@ -65,12 +124,7 @@ export function ChatInterface() {
           Authorization: `Bearer ${localStorage.getItem('token') || ''}`,
         },
         body: JSON.stringify({
-          query: messages[messages.length - 2]?.content || 'Query',
-          result: lastMessage.queryResult,
-          metadata: {
-            author: 'Campaign Analytics Bot',
-            company: 'Your Company',
-          },
+          messages: messages,
         }),
       });
 
@@ -78,16 +132,22 @@ export function ChatInterface() {
 
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
+
       const a = document.createElement('a');
       a.href = url;
-      a.download = `report-${new Date().toISOString().split('T')[0]}.${format === 'pdf' ? 'pdf' : 'pptx'}`;
+      a.download = `chat-export-${
+        new Date().toISOString().split('T')[0]
+      }.${format === 'pdf' ? 'pdf' : 'pptx'}`;
+
       document.body.appendChild(a);
       a.click();
+
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
 
       toast.success(`${format.toUpperCase()} exported successfully!`);
     } catch (error) {
+      console.error(error);
       toast.error(`Failed to export ${format.toUpperCase()}`);
     }
   };
@@ -97,7 +157,7 @@ export function ChatInterface() {
       {/* Header */}
       <header className='h-16 border-b border-border flex items-center justify-between px-6 bg-card'>
         <div>
-          <h2 className='font-semibold'>Campaign Analytics Assistant</h2>
+          <h2 className='font-semibold'>Analytics Bot Assistant</h2>
           <p className='text-xs text-muted-foreground'>
             Ask questions about your campaign performance in natural language
           </p>
@@ -128,19 +188,16 @@ export function ChatInterface() {
       </header>
 
       {/* Messages */}
-      <ScrollArea className='flex-1 p-6' ref={scrollRef}>
-        <div className='max-w-full overflow-scroll mx-auto space-y-6'>
+      <ScrollArea className='flex-1 p-6'>
+        <div className='p-6 max-w-full mx-auto space-y-6'>
           {messages.length === 0 ? (
             <div className='text-center py-20'>
               <div className='w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6'>
                 <Sparkles size={32} className='text-primary' />
               </div>
-              <h3 className='text-xl font-semibold mb-2'>
-                Welcome to Campaign Analytics
-              </h3>
+              <h3 className='text-xl font-semibold mb-2'>Welcome to Analytics Bot</h3>
               <p className='text-muted-foreground max-w-md mx-auto mb-8'>
-                Ask me anything about your campaign performance. I can analyze
-                data, create visualizations, and generate insights.
+                Ask me anything about your campaign performance. I can analyze data, create visualizations, and generate insights.
               </p>
 
               <div className='grid grid-cols-1 md:grid-cols-2 gap-3 max-w-lg mx-auto'>
@@ -161,30 +218,22 @@ export function ChatInterface() {
               </div>
             </div>
           ) : (
-            messages.map((message) => (
+            messages.map((message, index) => (
               <div
-                key={message.id}
+                key={`${message.id ?? message.timestamp}-${index}`}
                 className={`flex gap-4 ${message.role === 'user' ? 'flex-row-reverse' : ''}`}
               >
                 <Avatar
-                  className={
-                    message.role === 'assistant' ? 'bg-primary' : 'bg-muted'
-                  }
+                  className={message.role === 'assistant' ? 'bg-primary' : 'bg-muted'}
                 >
                   <AvatarFallback
-                    className={
-                      message.role === 'assistant'
-                        ? 'text-primary-foreground'
-                        : ''
-                    }
+                    className={message.role === 'assistant' ? 'text-primary-foreground' : ''}
                   >
                     {message.role === 'user' ? 'U' : 'AI'}
                   </AvatarFallback>
                 </Avatar>
 
-                <div
-                  className={`flex-1 space-y-3 ${message.role === 'user' ? 'text-right' : ''}`}
-                >
+                <div className={`flex-1 space-y-3 ${message.role === 'user' ? 'text-right' : ''}`}>
                   {/* Message Content */}
                   <div
                     className={`inline-block max-w-[80%] p-4 rounded-lg ${
@@ -211,39 +260,34 @@ export function ChatInterface() {
                     )}
 
                   {/* Data Table */}
-                  {message.queryResult &&
-                    message.queryResult.data.length > 0 && (
-                      <div className='bg-card border border-border rounded-lg overflow-hidden'>
-                        <DataTable
-                          data={message.queryResult.data}
-                          columns={message.queryResult.columns}
-                        />
-                      </div>
-                    )}
+                  {message.queryResult && message.queryResult.data.length > 0 && (
+                    <div className='bg-card border border-border rounded-lg overflow-hidden'>
+                      <DataTable
+                        data={message.queryResult.data}
+                        columns={message.queryResult.columns}
+                      />
+                    </div>
+                  )}
 
                   {/* Insights */}
-                  {message.queryResult?.insights &&
-                    message.queryResult.insights.length > 0 && (
-                      <div className='bg-primary/5 border border-primary/20 rounded-lg p-4'>
-                        <h4 className='text-sm font-medium text-primary mb-2 flex items-center gap-2'>
-                          <Sparkles size={16} />
-                          Key Insights
-                        </h4>
-                        <ul className='space-y-1'>
-                          {message.queryResult.insights.map((insight, idx) => (
-                            <li
-                              key={idx}
-                              className='text-sm text-muted-foreground flex items-start gap-2'
-                            >
-                              <span className='text-primary mt-1'>•</span>
-                              {insight}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
+                  {message.queryResult?.insights && message.queryResult.insights.length > 0 && (
+                    <div className='bg-primary/5 border border-primary/20 rounded-lg p-4'>
+                      <h4 className='text-sm font-medium text-primary mb-2 flex items-center gap-2'>
+                        <Sparkles size={16} />
+                        Key Insights
+                      </h4>
+                      <ul className='space-y-1'>
+                        {message.queryResult.insights.map((insight, idx) => (
+                          <li key={idx} className='text-sm text-muted-foreground flex items-start gap-2'>
+                            <span className='text-primary mt-1'>•</span>
+                            {insight}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
 
-                  {/* SQL Query (collapsible) */}
+                  {/* SQL Query */}
                   {message.queryResult?.sql && (
                     <details className='text-left'>
                       <summary className='text-xs text-muted-foreground cursor-pointer hover:text-foreground'>
@@ -263,9 +307,7 @@ export function ChatInterface() {
           {isLoading && (
             <div className='flex gap-4'>
               <Avatar className='bg-primary'>
-                <AvatarFallback className='text-primary-foreground'>
-                  AI
-                </AvatarFallback>
+                <AvatarFallback className='text-primary-foreground'>AI</AvatarFallback>
               </Avatar>
               <div className='flex items-center gap-2 text-muted-foreground'>
                 <Loader2 size={18} className='animate-spin' />
@@ -273,6 +315,9 @@ export function ChatInterface() {
               </div>
             </div>
           )}
+
+          {/* NEW: Auto-scroll target */}
+          <div ref={messagesEndRef} />
         </div>
       </ScrollArea>
 
@@ -296,8 +341,7 @@ export function ChatInterface() {
           </Button>
         </form>
         <p className='text-xs text-center text-muted-foreground mt-2'>
-          Press Enter to send. Campaign Analytics Bot processes your data
-          securely.
+          Press Enter to send. Analytics Bot Bot processes your data securely.
         </p>
       </div>
     </div>

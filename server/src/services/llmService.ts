@@ -11,7 +11,11 @@ import type { SQLGenerationResult, NLToSQLPrompt } from '../types/index.js';
  */
 class LLMService {
   private openai: AzureOpenAI;
-  private model: string;
+
+  // 🧠 Models
+  private sqlModel: string;
+  private intentModel: string;
+
   private temperature: number;
   private maxTokens: number;
 
@@ -30,7 +34,11 @@ class LLMService {
       });
     }
 
-    this.model = llmConfig.deploymentName || llmConfig.model;
+    // 🔥 Two-model setup
+    this.sqlModel = llmConfig.deploymentName || llmConfig.model;
+    // this.intentModel = "gpt-4o-mini";
+    this.intentModel = this.sqlModel;
+
     this.temperature = llmConfig.temperature;
     this.maxTokens = llmConfig.maxTokens;
   }
@@ -41,48 +49,68 @@ class LLMService {
 
   async naturalLanguageToSQL(
     userQuery: string,
-    conversationHistory: string[] = []
+    conversationHistory: { role: "user" | "assistant", content: string }[] = []
   ): Promise<SQLGenerationResult> {
+    
     try {
-      // ✅ NEW: Handle greetings / generic messages
-      // if (this.isGreetingOrGenericQuery(userQuery)) {
-      //   return this.getGreetingResponse();
-      // }
+      console.log("\n===============================");
+      console.log("🧑 User Query:", userQuery);
 
-      // Step 1: Schema context
+      // 🔁 STEP 0: Resolve follow-up query using conversation context
+      const resolvedQuery = await this.resolveFollowupQuery(
+        userQuery,
+        conversationHistory
+      );
+
+      console.log("🔁 Resolved Query:", resolvedQuery);
+
+      // 🧠 STEP 1: Intent Understanding
+      // const intentData = await this.classifyIntent(userQuery);
+      const intentData = await this.classifyIntent(
+          resolvedQuery,
+          conversationHistory
+      );
+      console.log("🧠 Intent Output:", JSON.stringify(intentData, null, 2));
+
+      // 🧠 STEP 2: Enhance Query
+      const enhancedQuery = this.enhanceQuery(resolvedQuery, intentData);
+      console.log("📝 Enhanced Query:", enhancedQuery);
+
+      // STEP 3: Schema Context
       const schemaContext = await this.buildSchemaContext();
 
-      // Step 2: Few-shot examples
+      // STEP 4: Few-shot Examples
       const fewShotExamples = this.getFewShotExamples();
 
-      // Step 3: Prompt
+      // STEP 5: Prompt
       const prompt = this.buildNLToSQLPrompt({
-        userQuery,
+        userQuery: enhancedQuery,
         schemaContext,
         fewShotExamples,
-        conversationHistory,
+        // conversationHistory,
       });
 
-      // Step 4: LLM call
+      // STEP 6: SQL Model Call
       const response = await this.openai.chat.completions.create({
-        // IMPORTANT: this must be the Azure DEPLOYMENT NAME
-        model: this.model,
-
+        model: this.sqlModel,
         messages: [
           {
-            role: 'system',
+            role: "system",
             content: `${this.getSystemPrompt()}
 IMPORTANT:
-- Respond with VALID JSON only
+- Respond ONLY with VALID JSON
 - Do NOT include markdown
-- Do NOT include explanations outside JSON`,
+- No explanation outside JSON`,
           },
+          ...conversationHistory.map(msg => ({
+            role: msg.role,
+            content: msg.content,
+          })),
           {
-            role: 'user',
+            role: "user",
             content: prompt,
           },
         ],
-
         temperature: this.temperature,
         max_tokens: this.maxTokens,
       });
@@ -90,19 +118,131 @@ IMPORTANT:
       const content = response.choices[0]?.message?.content;
 
       if (!content) {
-        throw new Error('Empty response from LLM');
+        throw new Error("Empty response from LLM");
       }
 
-      const result: SQLGenerationResult = JSON.parse(content);
+      console.log("🤖 Raw LLM Response:", content);
+
+      // ✅ Safe JSON parsing with markdown cleanup
+      let result: SQLGenerationResult;
+      try {
+        // Remove triple backticks or markdown tags
+        const cleanContent = content
+          .replace(/```json\s*/i, '')   // ```json at start
+          .replace(/```/g, '')          // any remaining ```
+          .trim();
+
+        result = JSON.parse(cleanContent);
+      } catch (err) {
+        console.error("❌ Invalid JSON from LLM:", content);
+        throw new Error("LLM returned invalid JSON");
+      }
+
+      console.log("🧾 Generated SQL:\n", result.sql);
 
       return {
         ...result,
         sql: this.validateAndFixSQL(result.sql),
       };
+
     } catch (error: any) {
-      console.error('NL to SQL error:', error);
+      console.error("❌ NL to SQL error:", error);
       throw new Error(`Failed to generate SQL: ${error.message}`);
     }
+  }
+
+  
+  // ============================================================================
+  // 🧠 INTENT MODEL
+  // ============================================================================
+
+  // async classifyIntent(userQuery: string) {
+  async classifyIntent(
+    userQuery: string,
+    conversationHistory: { role: "user" | "assistant"; content: string }[] = []
+  )  {
+    try {
+      const response = await this.openai.chat.completions.create({
+        model: this.intentModel,
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an expert in understanding analytics queries.',
+          },
+          {
+            role: 'user',
+            content: `Query: "${userQuery}"
+
+Classify intent and extract entities. Respond with JSON:
+{
+  "intent": "trend|comparison|aggregation|drill_down|single_value",
+  "entities": {
+    "time_range": "...",
+    "metric": "...",
+    "dimension": "...",
+    "filter": "..."
+  }
+}`,
+          },
+        ],
+        temperature: 0.1,
+        max_tokens: 200,
+        response_format: { type: 'json_object' },
+      });
+
+      return JSON.parse(response.choices[0]?.message?.content || '{}');
+
+    } catch (error) {
+      console.error('Intent classification error:', error);
+      return { intent: 'unknown', entities: {} };
+    }
+  }
+  
+  // ============================================================================
+  // 🧠 QUERY ENHANCER
+  // ============================================================================
+
+//   private enhanceQuery(userQuery: string, intentData: any): string {
+//     return `
+// Original Query:
+// ${userQuery}
+
+// Interpreted Context:
+// - Intent: ${intentData.intent}
+// - Metric: ${intentData.entities?.metric || 'N/A'}
+// - Dimension: ${intentData.entities?.dimension || 'N/A'}
+// - Time Range: ${intentData.entities?.time_range || 'N/A'}
+// - Filters: ${intentData.entities?.filter || 'N/A'}
+
+// Rewrite the query clearly including metric, dimension, filters, and time range.
+// Final Query:
+// `;
+//   }
+  
+
+  private enhanceQuery(userQuery: string, intentData: any): string {
+    return `
+  Original Query:
+  ${userQuery}
+
+  Interpreted Context:
+  - Intent: ${intentData.intent}
+  - Metric: ${intentData.entities?.metric || 'N/A'}
+  - Dimension: ${intentData.entities?.dimension || 'N/A'}
+  - Time Range: ${intentData.entities?.time_range || 'N/A'}
+  - Filters: ${intentData.entities?.filter || 'N/A'}
+
+  IMPORTANT:
+  - You MUST use the metric exactly as extracted above
+  - If metric = clicks → use SUM(clicks)
+  - If metric = impressions → use SUM(impressions)
+  - If metric = spend or costs → use SUM(costs_local)
+  - DO NOT fallback to other metrics
+  - DO NOT change metric
+
+  Rewrite the query clearly including metric, dimension, filters, and time range.
+  Final Query:
+  `;
   }
 
   // ============================================================================
@@ -139,7 +279,7 @@ IMPORTANT:
     return {
       sql: '',
       explanation:
-        `👋 Hi! I'm your campaign analytics assistant.
+        `👋 Hi! I'm your Analytics Bot assistant.
 
 I can help you turn **natural language questions into SQL queries** and analyze campaign performance — without exposing any raw data.
 
@@ -182,13 +322,30 @@ Just ask your question in plain English.`,
       context += '\n';
     }
 
+//     context += `
+// COMMON METRICS:
+// - ROAS = revenue / spend
+// - CTR = clicks / impressions * 100
+// - CPC = spend / clicks
+// - CPM = spend / impressions * 1000
+// `;
+
     context += `
-COMMON METRICS:
-- ROAS = revenue / spend
-- CTR = clicks / impressions * 100
-- CPC = spend / clicks
-- CPM = spend / impressions * 1000
-`;
+      
+      DERIVED METRICS:
+      - CTR = clicks / impressions * 100
+      - CPC = costs_local / clicks
+      - CPM = costs_local / impressions * 1000
+
+      IMPORTANT:
+      - revenue is NOT available
+      - ROI is NOT available
+      - ROAS is NOT available
+
+      If user asks unavailable metric:
+      RETURN empty SQL and explanation:
+      "Requested metric not available"
+      `;
 
     return context;
   }
@@ -258,28 +415,167 @@ Respond ONLY with valid JSON:
   "explanation": "",
   "chartType": "bar|line|table|metric",
   "confidence": 0.0,
-  "x_axis": "",
-  "y_axis": ""
+  "xAxis": "",
+  "yAxis": ""
 }
 `;
   }
 
+//   private getSystemPrompt(): string {
+// //     return `
+// // You are an expert BigQuery SQL generator for campaign analytics.
+// // You ONLY receive schema metadata.
+// // You NEVER receive real data.
+// // Respond ONLY with valid JSON.
+// // `;
+//     return `
+//     You are an expert BigQuery SQL generator for campaign analytics.
+
+//     STRICT RULES:
+//     - Only use metrics present in schema
+//     - Do NOT invent columns
+//     - If metric not available, return:
+//     {
+//     "sql": "",
+//     "explanation": "Metric not available",
+//     "chartType": "table",
+//     "confidence": 0
+//     }
+
+//     Respond ONLY with valid JSON.
+//     `;
+//   }
+
   private getSystemPrompt(): string {
-    return `
-You are an expert BigQuery SQL generator for campaign analytics.
-You ONLY receive schema metadata.
-You NEVER receive real data.
-Respond ONLY with valid JSON.
-`;
+      return `
+    You are an expert BigQuery SQL generator for campaign analytics.
+
+    STRICT RULES:
+
+    1. Only generate SQL for campaign analytics queries
+    2. Use ONLY metrics and columns present in schema
+    3. NEVER invent columns or tables
+    4. If user asks something unrelated to analytics (weather, jokes, general chat, etc)
+      return:
+    {
+      "sql": "",
+      "explanation": "This question is not related to campaign analytics.",
+      "chartType": "table",
+      "confidence": 0
+    }
+
+    5. If query is incomplete BUT conversation context exists,
+      infer missing metric/dimension from previous conversation
+
+    Example:
+    User: Top campaigns by spend
+    User: now least 10
+    → interpret as: Bottom 10 campaigns by spend
+
+    6. If metric truly not available in schema return:
+    {
+      "sql": "",
+      "explanation": "Requested metric not available",
+      "chartType": "table",
+      "confidence": 0
+    }
+
+    Respond ONLY with valid JSON.
+    `;
+    }
+
+  // private validateAndFixSQL(sql: string): string {
+  //   let fixed = sql;
+
+  //   if (!/limit\s+\d+/i.test(fixed)) {
+  //     fixed += '\nLIMIT 1000';
+  //   }
+
+  //   if (!fixed.includes('custom_dashboard_mvp.')) {
+  //     fixed = fixed.replace(/FROM\s+(\w+)/gi, 'FROM custom_dashboard_mvp.$1');
+  //     fixed = fixed.replace(/JOIN\s+(\w+)/gi, 'JOIN custom_dashboard_mvp.$1');
+  //   }
+
+  //   return fixed;
+  // }
+
+  private async resolveFollowupQuery(
+    userQuery: string,
+    conversationHistory: { role: "user" | "assistant"; content: string }[]
+  ): Promise<string> {
+
+    if (!conversationHistory.length) {
+      return userQuery;
+    }
+
+    try {
+      const response = await this.openai.chat.completions.create({
+        model: this.intentModel,
+        messages: [
+          {
+            role: "system",
+            content: `
+  You rewrite follow-up analytics queries into complete standalone queries.
+
+  Rules:
+  - Use previous conversation context
+  - Fill missing metric/dimension
+  - Keep same intent
+  - If already complete, return as-is
+
+  Examples:
+
+  User: Top 10 campaigns by spend
+  Followup: now least 10
+  Rewrite: Bottom 10 campaigns by spend
+
+  User: CTR by device
+  Followup: last 7 days
+  Rewrite: CTR by device for last 7 days
+
+  Return ONLY rewritten query text.
+  `
+          },
+          ...conversationHistory
+              .filter(m => m.role === "user")
+              .slice(-2)
+              .map(m => ({
+                role: "user" as const,
+                content: m.content
+              })),
+          {
+            role: "user",
+            content: userQuery
+          }
+        ],
+        temperature: 0,
+        max_tokens: 100
+      });
+
+      return response.choices[0]?.message?.content?.trim() || userQuery;
+
+    } catch {
+      return userQuery;
+    }
   }
 
+  // updated
+
   private validateAndFixSQL(sql: string): string {
+
+    // 🚨 DO NOT FIX EMPTY SQL
+    if (!sql || !sql.trim()) {
+      return "";
+    }
+
     let fixed = sql;
 
+    // add limit
     if (!/limit\s+\d+/i.test(fixed)) {
       fixed += '\nLIMIT 1000';
     }
 
+    // dataset prefix fix
     if (!fixed.includes('custom_dashboard_mvp.')) {
       fixed = fixed.replace(/FROM\s+(\w+)/gi, 'FROM custom_dashboard_mvp.$1');
       fixed = fixed.replace(/JOIN\s+(\w+)/gi, 'JOIN custom_dashboard_mvp.$1');
@@ -317,7 +613,7 @@ Respond ONLY with valid JSON.
   Format each insight as a single sentence. Be concise and data-driven.
   `;
       const response = await this.openai.chat.completions.create({
-        model: this.model,
+        model: this.intentModel,
         messages: [
           {
             role: 'system',
@@ -342,43 +638,6 @@ Respond ONLY with valid JSON.
     } catch (error) {
       console.error('Insights generation error:', error);
       return ['Unable to generate insights at this time.'];
-    }
-  }
-  /**
-   * Classify query intent
-   */
-  async classifyIntent(userQuery: string) {
-    try {
-      const response = await this.openai.chat.completions.create({
-        model: this.model,
-        messages: [
-          {
-            role: 'system',
-            content: 'Classify the intent of analytics queries.',
-          },
-          {
-            role: 'user',
-            content: `Query: "${userQuery}"
-  
-  Classify intent and extract entities. Respond with JSON:
-  {
-    "intent": "trend|comparison|aggregation|drill_down|single_value",
-    "entities": {
-      "time_range": "...",
-      "metric": "...",
-      "dimension": "...",
-      "filter": "..."
-    }
-  }`,
-          },
-        ],
-        temperature: 0.1,
-        max_tokens: 200,
-        response_format: { type: 'json_object' },
-      });
-      return JSON.parse(response.choices[0]?.message?.content || '{}');
-    } catch (error) {
-      return { intent: 'unknown', entities: {} };
     }
   }
 }

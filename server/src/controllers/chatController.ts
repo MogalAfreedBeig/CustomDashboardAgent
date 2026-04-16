@@ -11,8 +11,6 @@ export class ChatController {
   async executeQuery(req: Request, res: Response): Promise<void> {
     try {
       const { query, conversationId, context } = req.body as QueryRequest;
-      console.log(query, conversationId, context);
-
 
       if (!query || query.trim().length === 0) {
         res.status(400).json({
@@ -56,11 +54,30 @@ export class ChatController {
   /**
    * Get conversation history
    */
+  // async getConversation(req: Request, res: Response): Promise<void> {
+  //   try {
+  //     const { conversationId } = req.params;
+
+  //     const messages = queryService.getConversation(conversationId as string);
+
+  //     res.json({
+  //       success: true,
+  //       data: { conversationId, messages },
+  //     });
+  //   } catch (error) {
+  //     if (error instanceof Error)
+  //       res.status(500).json({
+  //         success: false,
+  //         error: { code: 'FETCH_FAILED', message: error.message },
+  //       });
+  //   }
+  // }
+
   async getConversation(req: Request, res: Response): Promise<void> {
     try {
       const { conversationId } = req.params;
 
-      const messages = queryService.getConversation(conversationId as string);
+      const messages = await queryService.getConversation(conversationId as string);
 
       res.json({
         success: true,
@@ -78,94 +95,120 @@ export class ChatController {
   /**
    * Get user's conversations
    */
-  async getUserConversations(req: Request, res: Response): Promise<void> {
-    try {
-      const userId = (req as any).user?.id || 'anonymous';
+  // async getUserConversations(req: Request, res: Response): Promise<void> {
+  //   try {
+  //     const userId = (req as any).user?.id || 'anonymous';
 
-      const conversations = queryService.getUserConversations(userId);
+  //     const conversations = queryService.getUserConversations(userId);
+
+  //     res.json({
+  //       success: true,
+  //       data: conversations,
+  //     });
+  //   } catch (error) {
+  //     if (error instanceof Error)
+  //       res.status(500).json({
+  //         success: false,
+  //         error: { code: 'FETCH_FAILED', message: error.message },
+  //       });
+  //   }
+  // }
+
+  async getUserConversations(req: Request, res: Response) {
+    try {
+      const userId = "anonymous";
+
+      const conversations =
+        await queryService.getUserConversations(userId);
 
       res.json({
         success: true,
         data: conversations,
       });
+
     } catch (error) {
-      if (error instanceof Error)
-        res.status(500).json({
-          success: false,
-          error: { code: 'FETCH_FAILED', message: error.message },
-        });
+      console.error("getUserConversations error:", error);
+
+      res.status(500).json({
+        success: false,
+        error: "Failed to fetch conversations",
+      });
     }
   }
 
   /**
    * Delete a conversation
    */
+  // async deleteConversation(req: Request, res: Response): Promise<void> {
+  //   try {
+  //     const { conversationId } = req.params;
+
+  //     // In a real implementation, delete from database
+
+  //     res.json({
+  //       success: true,
+  //       data: { deleted: true },
+  //     });
+  //   } catch (error) {
+  //     if (error instanceof Error)
+  //       res.status(500).json({
+  //         success: false,
+  //         error: { code: 'DELETE_FAILED', message: error.message },
+  //       });
+  //   }
+  // }
+
   async deleteConversation(req: Request, res: Response): Promise<void> {
     try {
-      const { conversationId } = req.params;
+      const conversationId = req.params.conversationId as string;
 
-      // In a real implementation, delete from database
+      await queryService.deleteConversation(conversationId);
 
       res.json({
         success: true,
         data: { deleted: true },
       });
     } catch (error) {
-      if (error instanceof Error)
-        res.status(500).json({
-          success: false,
-          error: { code: 'DELETE_FAILED', message: error.message },
-        });
+      res.status(500).json({
+        success: false,
+        error: { code: 'DELETE_FAILED', message: 'Failed to delete chat' },
+      });
     }
   }
 
-  /**
-   * Export query result to PDF
-   */
   async exportToPDF(req: Request, res: Response): Promise<void> {
     try {
-      const { query, result, metadata } = req.body;
+      const { messages } = req.body;
 
-      const exportConfig = exportService.createExportConfigFromResult(
-        query,
-        result,
-        metadata
-      );
-
-      const pdfBuffer = await exportService.exportToPDF(exportConfig);
+      const pdfBuffer = await exportService.exportChatToPDF(messages);
 
       res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', 'attachment; filename="report.pdf"');
+      res.setHeader('Content-Disposition', 'attachment; filename="chat-report.pdf"');
       res.send(pdfBuffer);
     } catch (error) {
       if (error instanceof Error)
         res.status(500).json({
           success: false,
-          error: { code: 'EXPORT_FAILED', message: error?.message },
+          error: { code: 'EXPORT_FAILED', message: error.message },
         });
     }
   }
 
-  /**
-   * Export query result to PowerPoint
-   */
   async exportToPPT(req: Request, res: Response): Promise<void> {
     try {
-      const { query, result, metadata } = req.body;
+      const { messages } = req.body;
 
-      const exportConfig = exportService.createExportConfigFromResult(
-        query,
-        result,
-        metadata
+      const pptBuffer = await exportService.exportChatToPPT(messages);
+
+      res.setHeader(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+      );
+      res.setHeader(
+        'Content-Disposition',
+        'attachment; filename="chat-report.pptx"'
       );
 
-      const pptBuffer = await exportService.exportToPPT({
-        ...exportConfig,
-        format: 'ppt',
-      });
-
-      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.presentationml.presentation');
-      res.setHeader('Content-Disposition', 'attachment; filename="report.pptx"');
       res.send(pptBuffer);
     } catch (error) {
       if (error instanceof Error)

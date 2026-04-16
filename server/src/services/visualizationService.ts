@@ -38,6 +38,11 @@ class VisualizationService {
     }
   ): Promise<VisualizationConfig | undefined> {
     const { type, title, xAxis, yAxis } = options;
+    
+    console.log("\n🎯 ===== VIS SERVICE START =====");
+    console.log("Requested Type:", type);
+    console.log("Data Length:", data.length);
+    console.log("Columns:", columns.map(c => c.name));
 
     // Auto-detect chart type if not specified
     let chartType = type || this.detectChartType(data, columns);
@@ -206,26 +211,61 @@ class VisualizationService {
       };
     }
 
+    // if (axes.yAxis) {
+    //   baseConfig.yAxis = {
+    //     field: axes.yAxis,
+    //     label: this.formatLabel(axes.yAxis),
+    //     format: this.detectFormat(axes.yAxis, columns),
+    //   };
+    // }
+
+    // updated 
     if (axes.yAxis) {
       baseConfig.yAxis = {
         field: axes.yAxis,
         label: this.formatLabel(axes.yAxis),
         format: this.detectFormat(axes.yAxis, columns),
       };
+
+      // ✅ ADD PRIMARY SERIES COLOR
+      baseConfig.series = [
+        {
+          field: axes.yAxis,
+          label: this.formatLabel(axes.yAxis),
+          color: this.colorPalettes.default[0],
+          type: this.getSeriesTypeForChart(chartType),
+        }
+      ];
     }
 
     // Add series configuration for multi-series charts
+    // const seriesFields = (axes.series || []).filter(
+    //   (field) => !(chartType === 'combo' && field === axes.yAxis2)
+    // );
+    // if (seriesFields.length > 0) {
+    //   baseConfig.series = seriesFields.map((field, index) => ({
+    //     field,
+    //     label: this.formatLabel(field),
+    //     color: this.colorPalettes.default[index % this.colorPalettes.default.length],
+    //     type: this.getSeriesTypeForChart(chartType),
+    //   }));
+    // }
+
     const seriesFields = (axes.series || []).filter(
-      (field) => !(chartType === 'combo' && field === axes.yAxis2)
-    );
-    if (seriesFields.length > 0) {
-      baseConfig.series = seriesFields.map((field, index) => ({
-        field,
-        label: this.formatLabel(field),
-        color: this.colorPalettes.default[index % this.colorPalettes.default.length],
-        type: this.getSeriesTypeForChart(chartType),
-      }));
-    }
+        (field) => !(chartType === 'combo' && field === axes.yAxis2)
+      );
+
+      if (seriesFields.length > 0) {
+        baseConfig.series = [
+          ...(baseConfig.series || []),
+          ...seriesFields.map((field, index) => ({
+            field,
+            label: this.formatLabel(field),
+            color: this.colorPalettes.default[(index + 1) % this.colorPalettes.default.length],
+            type: this.getSeriesTypeForChart(chartType),
+          }))
+        ];
+      }
 
     // Add second Y-axis for combo charts
     if (axes.yAxis2 && chartType === 'combo') {

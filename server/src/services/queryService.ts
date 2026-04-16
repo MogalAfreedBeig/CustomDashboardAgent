@@ -11,23 +11,10 @@ import type {
 } from '../types/index.js';
 import type { ChatMessage } from '@shared/types/index.js';
 
-/**
- * Query Service - Main Orchestrator
- * 
- * Handles the complete flow:
- * 1. Natural Language Query → SQL
- * 2. SQL → BigQuery Execution
- * 3. Results → Visualization
- * 4. Results → Insights
- */
-
 class QueryService {
   private activeQueries: Map<string, StreamingQueryState> = new Map();
   private conversationHistory: Map<string, ChatMessage[]> = new Map();
 
-  /**
-   * Execute a natural language query
-   */
   async executeQuery(
     request: QueryRequest,
     userId: string,
@@ -37,7 +24,6 @@ class QueryService {
     const startTime = Date.now();
 
     try {
-      // Initialize query state
       this.activeQueries.set(queryId, {
         queryId,
         userId,
@@ -45,35 +31,86 @@ class QueryService {
         startTime: new Date(),
       });
 
-      // Step 1: Get conversation history
       const conversationHistory = this.getConversationHistory(request.conversationId);
 
-      // Step 2: Generate SQL from natural language
       onUpdate?.({ type: 'thinking', data: { message: 'Understanding your query...' } });
+
+      // ✅ convert history to LLM format
+      const formattedHistory = conversationHistory.map(m => ({
+        role: m.role as "user" | "assistant",
+        content: m.content
+      }));
 
       const sqlResult = await llmService.naturalLanguageToSQL(
         request.query,
-        conversationHistory.map(m => m.content)
+        formattedHistory
       );
 
+      
+      // 🚨 STOP IF NO SQL
+      if (!sqlResult.sql || !sqlResult.sql.trim()) {
+
+        onUpdate?.({
+          type: 'error',
+          data: { message: sqlResult.explanation || "Requested data not available" }
+        });
+
+        return {
+          queryId,
+          sql: '',
+          data: [],
+          columns: [],
+          metadata: {
+            totalRows: 0,
+            executionTimeMs: Date.now() - startTime,
+            costBytes: 0,
+          },
+          visualization: undefined,
+          insights: [sqlResult.explanation || "Requested data not available"],
+        };
+      }
 
       onUpdate?.({
         type: 'sql',
         data: { sql: sqlResult.sql, explanation: sqlResult.explanation }
       });
 
-      // Update state
       this.activeQueries.get(queryId)!.status = 'executing';
       this.activeQueries.get(queryId)!.sql = sqlResult.sql;
 
-      // Step 3: Execute SQL on BigQuery
       onUpdate?.({ type: 'thinking', data: { message: 'Fetching data...' } });
 
       const queryResult = await bigqueryService.executeQuery(sqlResult.sql, {
-        useCache: true,
+        useCache: false,
         maxResults: 10000,
       });
 
+      // 🚨 EMPTY DATA CHECK
+      if (this.isDataEmpty(queryResult.data, queryResult.columns)) {
+
+        onUpdate?.({
+          type: 'error',
+          data: {
+            message: `No data available for "${request.query}".`
+          }
+        });
+
+        return {
+          queryId,
+          sql: sqlResult.sql,
+          data: [],
+          columns: [],
+          metadata: {
+            totalRows: 0,
+            executionTimeMs: Date.now() - startTime,
+            costBytes: queryResult.metadata.costBytes,
+          },
+          visualization: undefined,
+          insights: [
+            `No data available for "${request.query}". Try using different metric like spend, clicks, impressions.`
+          ],
+        };
+      }
 
       onUpdate?.({
         type: 'results',
@@ -84,10 +121,8 @@ class QueryService {
         },
       });
 
-      // Update state
       this.activeQueries.get(queryId)!.status = 'formatting';
 
-      // Step 4: Generate visualization
       onUpdate?.({ type: 'thinking', data: { message: 'Creating visualization...' } });
 
       const visualization = await visualizationService.generateVisualization(
@@ -108,7 +143,6 @@ class QueryService {
         });
       }
 
-      // Step 5: Generate insights
       onUpdate?.({ type: 'thinking', data: { message: 'Generating insights...' } });
 
       const insights = await llmService.generateInsights(
@@ -123,10 +157,8 @@ class QueryService {
         data: { insights },
       });
 
-      // Update state
       this.activeQueries.get(queryId)!.status = 'complete';
 
-      // Save to conversation history
       this.addToConversation(request.conversationId || queryId, [
         { id: uuidv4(), role: 'user', content: request.query, timestamp: new Date().toISOString() },
         {
@@ -148,6 +180,61 @@ class QueryService {
         },
       ]);
 
+      // to store the chat history
+
+      // await bigqueryService.insertChatHistory({
+      //     conversation_id: request.conversationId ?? queryId,
+      //     query_id: queryId,
+      //     user_id: userId,
+      //     role: "user",
+      //     message: request.query,
+      //     sql: null,
+      //     chart_type: null,
+      //     response: null,
+      //     created_at: new Date().toISOString(),
+      // });
+
+      // await bigqueryService.insertChatHistory({
+      //   conversation_id: request.conversationId ?? queryId,
+      //   query_id: queryId,
+      //   user_id: userId,
+      //   role: "assistant",
+      //   message: sqlResult.explanation,
+      //   sql: sqlResult.sql,
+      //   chart_type: sqlResult.chartType,
+      //   response: JSON.stringify({
+      //     insights,
+      //     visualization,
+      //   }),
+      //   created_at: new Date().toISOString(),
+      // });
+
+      // store user message
+      await bigqueryService.insertChatHistory({
+        conversation_id: request.conversationId ?? queryId,
+        query_id: queryId,
+        user_id: userId,
+        role: "user",
+        message: request.query,
+      });
+
+      // store assistant message
+      await bigqueryService.insertChatHistory({
+        conversation_id: request.conversationId ?? queryId,
+        query_id: queryId,
+        user_id: userId,
+        role: "assistant",
+        message: sqlResult.explanation,
+
+        sql: sqlResult.sql,
+
+        data: queryResult.data,
+        columns: queryResult.columns,
+
+        visualization: visualization,
+        insights: insights,
+      });
+
       onUpdate?.({ type: 'complete', data: {} });
 
       return {
@@ -163,8 +250,8 @@ class QueryService {
         visualization,
         insights,
       };
+
     } catch (error: any) {
-      // Update state
       this.activeQueries.get(queryId)!.status = 'error';
       this.activeQueries.get(queryId)!.error = error.message;
 
@@ -175,62 +262,147 @@ class QueryService {
 
       throw error;
     } finally {
-      // Clean up after some time
       setTimeout(() => this.activeQueries.delete(queryId), 5 * 60 * 1000);
     }
   }
 
-  /**
-   * Get conversation history
-   */
+  async deleteConversation(conversationId: string): Promise<boolean> {
+    await bigqueryService.deleteConversation(conversationId);
+
+    // also remove from memory
+    this.conversationHistory.delete(conversationId);
+
+    return true;
+  }
+
+  // 🚨 EMPTY DATA DETECTOR
+  private isDataEmpty(data: any[], columns: any[]): boolean {
+    if (!data || data.length === 0) return true;
+
+    const numericCols = columns
+      .filter(c =>
+        c.type === 'NUMERIC' ||
+        c.type === 'INTEGER' ||
+        c.type === 'FLOAT'
+      )
+      .map(c => c.name);
+
+    if (!numericCols.length) return false;
+
+    let hasNonZero = false;
+
+    for (const row of data) {
+      for (const col of numericCols) {
+        const val = row[col];
+        if (val !== 0 && val !== null && val !== undefined) {
+          hasNonZero = true;
+          break;
+        }
+      }
+    }
+
+    return !hasNonZero;
+  }
+
   private getConversationHistory(conversationId?: string): ChatMessage[] {
     if (!conversationId) return [];
     return this.conversationHistory.get(conversationId) || [];
   }
 
-  /**
-   * Add messages to conversation history
-   */
   private addToConversation(conversationId: string, messages: ChatMessage[]): void {
     const existing = this.conversationHistory.get(conversationId) || [];
     this.conversationHistory.set(conversationId, [...existing, ...messages]);
 
-    // Limit history size
     if (this.conversationHistory.get(conversationId)!.length > 50) {
       const trimmed = this.conversationHistory.get(conversationId)!.slice(-50);
       this.conversationHistory.set(conversationId, trimmed);
     }
   }
 
-  /**
-   * Get conversation by ID
-   */
-  getConversation(conversationId: string): ChatMessage[] {
-    return this.conversationHistory.get(conversationId) || [];
+  // getConversation(conversationId: string): ChatMessage[] {
+  //   return this.conversationHistory.get(conversationId) || [];
+  // }
+
+  // async getConversation(conversationId: string): Promise<ChatMessage[]> {
+  //   const rows = await bigqueryService.getConversationHistory(conversationId);
+
+  //   return rows.map((row: any) => ({
+  //     id: row.query_id,
+  //     role: row.role,
+  //     content: row.message,
+  //     timestamp: row.created_at,
+  //     sql: row.sql,
+  //     chartType: row.chart_type,
+  //     response: row.response ? JSON.parse(row.response) : null,
+  //   }));
+  // }
+
+  async getConversation(conversationId: string): Promise<ChatMessage[]> {
+    const rows = await bigqueryService.getConversationHistory(conversationId);
+
+    return rows.map((row: any) => {
+      const data = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
+      const columns = typeof row.columns === 'string' ? JSON.parse(row.columns) : row.columns;
+      const insights = typeof row.insights === 'string' ? JSON.parse(row.insights) : row.insights;
+      const visualization =
+        typeof row.visualization === 'string'
+          ? JSON.parse(row.visualization)
+          : row.visualization;
+
+      return {
+        id: row.query_id,
+        role: row.role,
+        content: row.message,
+        timestamp: row.created_at,
+
+        visualization: visualization,
+
+        queryResult: data
+          ? {
+              queryId: row.query_id,
+              sql: row.sql,
+              data: data,
+              columns: columns,
+              insights: insights,
+              visualization: visualization,
+
+              metadata: {
+                totalRows: data?.length || 0,
+                executionTimeMs: 0,
+                costBytes: 0,
+                truncated: false,   // ✅ required
+                cacheHit: false,    // ✅ required
+              },
+
+              executionTimeMs: 0,
+            }
+          : undefined,
+      };
+    });
   }
 
-  /**
-   * Get all conversations for a user
-   */
-  getUserConversations(userId: string): { id: string; title: string; updatedAt: string }[] {
-    const conversations: { id: string; title: string; updatedAt: string }[] = [];
+  // getUserConversations(userId: string): { id: string; title: string; updatedAt: string }[] {
+  //   const conversations: { id: string; title: string; updatedAt: string }[] = [];
 
-    for (const [id, messages] of this.conversationHistory.entries()) {
-      if (messages.length > 0) {
-        conversations.push({
-          id,
-          title: messages[0].content.slice(0, 50) + '...',
-          updatedAt: messages[messages.length - 1].timestamp,
-        });
-      }
+  //   for (const [id, messages] of this.conversationHistory.entries()) {
+  //     if (messages.length > 0) {
+  //       conversations.push({
+  //         id,
+  //         title: messages[0].content.slice(0, 50) + '...',
+  //         updatedAt: messages[messages.length - 1].timestamp,
+  //       });
+  //     }
+  //   }
+
+  //   return conversations;
+  // }
+
+  async getUserConversations(
+      userId: string
+    ): Promise<{ id: string; title: string; updatedAt: string }[]> {
+      return await bigqueryService.getUserConversations(userId);
     }
 
-    return conversations;
-  }
-
-  /**
-   * Cancel an active query
-   */
   cancelQuery(queryId: string): boolean {
     const query = this.activeQueries.get(queryId);
     if (query) {
@@ -241,16 +413,10 @@ class QueryService {
     return false;
   }
 
-  /**
-   * Get query status
-   */
   getQueryStatus(queryId: string): StreamingQueryState | undefined {
     return this.activeQueries.get(queryId);
   }
 }
-
-// Import visualization service
-// ...existing code...
 
 export const queryService = new QueryService();
 export default queryService;

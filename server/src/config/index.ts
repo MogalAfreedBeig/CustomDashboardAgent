@@ -44,7 +44,7 @@ export const llmConfig: LLMConfig = {
     ? `https://${process.env.AZURE_OPENAI_API_INSTANCE_NAME}.openai.azure.com/`
     : undefined,
   deploymentName: process.env.AZURE_OPENAI_API_DEPLOYMENT_NAME,
-  apiVersion: process.env.AZURE_OPENAI_API_VERSION,
+  apiVersion: process.env.AZURE_OPENAI_API_VERSION
 };
 
 export const encryptionConfig: EncryptionConfig = {

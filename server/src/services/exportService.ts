@@ -762,7 +762,7 @@ class ExportService {
       {
         type: 'header',
         content: {
-          title: 'Campaign Analytics Report',
+          title: 'Analytics Bot Report',
           subtitle: query,
           date: new Date().toLocaleDateString(),
           author: exportAuthor,
@@ -812,7 +812,7 @@ class ExportService {
 
     return {
       format: 'pdf',
-      title: 'Campaign Analytics Report',
+      title: 'Analytics Bot Report',
       includeDate: true,
       sections,
       theme: this.defaultTheme,
@@ -822,6 +822,183 @@ class ExportService {
         confidential: true,
       },
     };
+  }
+
+  async exportChatToPPT(messages: any[]): Promise<Buffer> {
+
+    const sections: ExportSection[] = [
+      {
+        type: 'header',
+        content: {
+          title: 'Chat Conversation Report',
+          subtitle: 'Analytics Chat Export',
+          date: new Date().toLocaleDateString(),
+          author: 'Analytics Assistant',
+        },
+      },
+    ];
+
+    for (const message of messages) {
+      // user message
+      if (message.role === 'user') {
+        sections.push({
+          type: 'text',
+          content: {
+            title: 'User',
+            body: message.content,
+          },
+        });
+      }
+
+      // assistant message
+      if (message.role === 'assistant') {
+        const result = message.queryResult;
+
+        // TEXT
+        sections.push({
+          type: 'text',
+          content: {
+            title: 'Assistant',
+            body: message.content,
+          },
+        });
+
+        // CHART
+        if (message.visualization && result?.data?.length) {
+          sections.push({
+            type: 'chart',
+            content: {
+              title: message.visualization.title || 'Chart',
+              chartConfig: message.visualization,
+              data: result.data,
+            },
+          });
+        }
+
+        // TABLE
+        if (result?.data?.length) {
+          const headers = Object.keys(result.data[0]);
+          const rows = result.data.map((row: any) =>
+            headers.map((h) => this.formatExportCell(row[h]))
+          );
+
+          sections.push({
+            type: 'table',
+            content: {
+              title: 'Data Table',
+              headers,
+              rows,
+            },
+          });
+        }
+
+        // INSIGHTS
+        if (result?.insights?.length) {
+          sections.push({
+            type: 'insights',
+            content: {
+              title: 'Key Insights',
+              insights: result.insights,
+            },
+          });
+        }
+      }
+    }
+
+    return this.exportToPPT({
+      format: 'ppt',
+      title: 'Chat Export',
+      includeDate: true,
+      sections,
+      theme: this.defaultTheme,
+      metadata: {
+        author: 'Analytics Assistant',
+        company: 'C9H',
+        confidential: false,
+      },
+    });
+  }
+
+  async exportChatToPDF(messages: any[]): Promise<Buffer> {
+    const sections: ExportSection[] = [
+      {
+        type: 'header',
+        content: {
+          title: 'Chat Conversation Report',
+          subtitle: 'Analytics Chat Export',
+          date: new Date().toLocaleDateString(),
+          author: 'Analytics Assistant',
+        },
+      },
+    ];
+
+    for (const message of messages) {
+      // USER
+      if (message.role === 'user') {
+        sections.push({
+          type: 'text',
+          content: {
+            title: 'User',
+            body: message.content,
+          },
+        });
+      }
+
+      // ASSISTANT
+      if (message.role === 'assistant') {
+        const result = message.queryResult;
+
+        // TEXT
+        sections.push({
+          type: 'text',
+          content: {
+            title: 'Assistant',
+            body: message.content,
+          },
+        });
+
+        // INSIGHTS
+        if (result?.insights?.length) {
+          sections.push({
+            type: 'insights',
+            content: {
+              title: 'Key Insights',
+              insights: result.insights,
+            },
+          });
+        }
+
+        // TABLE
+        if (result?.data?.length) {
+          const headers = Object.keys(result.data[0]);
+          const rows = result.data.map((row: any) =>
+            headers.map((h) => this.formatExportCell(row[h]))
+          );
+
+          sections.push({
+            type: 'table',
+            content: {
+              title: 'Data Table',
+              headers,
+              rows,
+            },
+          });
+        }
+      }
+    }
+
+    return this.exportToPDF({
+      format: 'pdf',
+      title: 'Chat Export',
+      includeDate: true,
+      sections,
+      theme: this.defaultTheme,
+      metadata: {
+        author: 'Analytics Assistant',
+        company: 'C9H',
+        confidential: false,
+      },
+    });
   }
 }
 
