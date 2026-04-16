@@ -63,12 +63,10 @@ app.use('/apiv2/v1', routes);
 /* ======================
    Serve Frontend (Vite build)
 ====================== */
-// const distPath = path.resolve(__dirname, '../client');
-const distPath = path.resolve(__dirname, '../../dist');
+const distPath = path.resolve(process.cwd(), 'dist');
 
 app.use(express.static(distPath));
 
-// SPA fallback (React Router support)
 app.get(/^(?!\/apiv2\/).*/, (req, res) => {
   res.sendFile(path.join(distPath, 'index.html'));
 });
