@@ -189,7 +189,7 @@ export function ChatInterface() {
 
       {/* Messages */}
       <ScrollArea className='flex-1 p-6'>
-        <div className='p-6 max-w-full mx-auto space-y-6'>
+        <div className='w-full max-w-5xl mx-auto space-y-6'>
           {messages.length === 0 ? (
             <div className='text-center py-20'>
               <div className='w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6'>
@@ -236,7 +236,7 @@ export function ChatInterface() {
                 <div className={`flex-1 space-y-3 ${message.role === 'user' ? 'text-right' : ''}`}>
                   {/* Message Content */}
                   <div
-                    className={`inline-block max-w-[80%] p-4 rounded-lg ${
+                    className={`inline-block max-w-[85%] lg:max-w-[75%] p-4 rounded-lgg ${
                       message.role === 'user'
                         ? 'bg-primary text-primary-foreground'
                         : 'bg-card border border-border'
@@ -323,7 +323,10 @@ export function ChatInterface() {
 
       {/* Input Area */}
       <div className='border-t border-border p-4 bg-card'>
-        <form onSubmit={handleSubmit} className='max-w-fit mx-auto flex gap-3'>
+        <form 
+          onSubmit={handleSubmit} 
+          className='w-full max-w-5xl mx-auto flex gap-3'
+        >
           <Input
             ref={inputRef}
             value={input}
