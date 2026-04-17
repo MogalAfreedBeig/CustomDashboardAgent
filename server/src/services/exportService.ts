@@ -255,19 +255,21 @@ class ExportService {
   ): void {
     const slide = pres.addSlide({ masterName: 'MASTER_SLIDE' });
 
+    // HEADER TITLE (inside blue bar)
     slide.addText(content.title, {
       x: 0.5,
-      y: 1,
+      y: 0.18,
       w: 9,
-      h: 0.5,
-      fontSize: 24,
+      h: 0.4,
+      fontSize: 18,
       bold: true,
-      color: theme.primaryColor.replace('#', ''),
+      color: 'FFFFFF',
     });
 
+    // BODY
     slide.addText(content.body, {
       x: 0.5,
-      y: 1.8,
+      y: 1.0,
       w: 9,
       h: 5,
       fontSize: 14,
@@ -285,21 +287,22 @@ class ExportService {
   ): Promise<void> {
     const slide = pres.addSlide({ masterName: 'MASTER_SLIDE' });
 
+    // HEADER TITLE
     slide.addText(content.title, {
       x: 0.5,
-      y: 1,
+      y: 0.18,
       w: 9,
-      h: 0.5,
-      fontSize: 24,
+      h: 0.4,
+      fontSize: 18,
       bold: true,
-      color: theme.primaryColor.replace('#', ''),
+      color: 'FFFFFF',
     });
 
     const chartData = this.transformChartData(content.data, content.chartConfig);
     if (chartData.length === 0) {
       slide.addText('Chart data unavailable', {
         x: 0.5,
-        y: 2.4,
+        y: 2.0,
         w: 9,
         h: 0.5,
         fontSize: 14,
@@ -311,10 +314,12 @@ class ExportService {
 
     const chartOptions: Record<string, unknown> = {
       x: 0.5,
-      y: 1.8,
+      y: 1.0,
       w: 9,
-      h: 4.5,
-      chartColors: content.chartConfig.config.colors?.map(c => c.replace('#', '').slice(0, 6)),
+      h: 5.2,
+      chartColors: content.chartConfig.config.colors?.map((c: string) =>
+        c.replace('#', '').slice(0, 6)
+      ),
       showLegend: content.chartConfig.config.showLegend,
       showValue: true,
     };
@@ -323,7 +328,11 @@ class ExportService {
       chartOptions.barGrouping = 'stacked';
     }
 
-    slide.addChart(this.mapChartType(content.chartConfig.type, pres), chartData, chartOptions);
+    slide.addChart(
+      this.mapChartType(content.chartConfig.type, pres),
+      chartData,
+      chartOptions
+    );
   }
 
   /**
@@ -336,29 +345,36 @@ class ExportService {
   ): void {
     const slide = pres.addSlide({ masterName: 'MASTER_SLIDE' });
 
+    // HEADER TITLE
     slide.addText(content.title, {
       x: 0.5,
-      y: 1,
+      y: 0.18,
       w: 9,
-      h: 0.5,
-      fontSize: 24,
+      h: 0.4,
+      fontSize: 18,
       bold: true,
-      color: theme.primaryColor.replace('#', ''),
+      color: 'FFFFFF',
     });
 
     const tableData = [
       content.headers.map(h => ({
         text: this.formatExportCell(h),
-        options: { bold: true, fill: theme.primaryColor.replace('#', ''), color: 'FFFFFF' },
+        options: {
+          bold: true,
+          fill: theme.primaryColor.replace('#', ''),
+          color: 'FFFFFF',
+        },
       })),
-      ...content.rows.map((row) => row.map((cell) => this.formatExportCell(cell))),
+      ...content.rows.map(row =>
+        row.map(cell => this.formatExportCell(cell))
+      ),
     ];
 
     slide.addTable(tableData, {
       x: 0.5,
-      y: 1.8,
+      y: 1.0,
       w: 9,
-      h: 4.5,
+      h: 5.2,
       fontSize: 10,
       border: { type: 'solid', pt: 0.5, color: 'CCCCCC' },
       colW: content.headers.map(() => 9 / content.headers.length),
@@ -375,23 +391,24 @@ class ExportService {
   ): void {
     const slide = pres.addSlide({ masterName: 'MASTER_SLIDE' });
 
+    // HEADER TITLE
     slide.addText(content.title, {
       x: 0.5,
-      y: 1,
+      y: 0.18,
       w: 9,
-      h: 0.5,
-      fontSize: 24,
+      h: 0.4,
+      fontSize: 18,
       bold: true,
-      color: theme.primaryColor.replace('#', ''),
+      color: 'FFFFFF',
     });
 
-    const insightsText = content.insights.map((insight, i) =>
-      `${i + 1}. ${insight}`
-    ).join('\n\n');
+    const insightsText = content.insights
+      .map((insight, i) => `${i + 1}. ${insight}`)
+      .join('\n\n');
 
     slide.addText(insightsText, {
       x: 0.5,
-      y: 1.8,
+      y: 1.0,
       w: 9,
       h: 5,
       fontSize: 14,
@@ -399,7 +416,6 @@ class ExportService {
       bullet: true,
     });
   }
-
   /**
    * Map internal chart type to PptxGenJS chart type
    */
