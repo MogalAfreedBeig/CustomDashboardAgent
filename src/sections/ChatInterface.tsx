@@ -188,8 +188,8 @@ export function ChatInterface() {
       </header>
 
       {/* Messages */}
-      <ScrollArea className='flex-1 overflow-y-auto'>
-        <div className='p-6 w-full px-20 space-y-6'>
+      <ScrollArea className='flex-1 p-6'>
+        <div className='p-6 max-w-full mx-auto space-y-6'>
           {messages.length === 0 ? (
             <div className='text-center py-20'>
               <div className='w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6'>
@@ -202,7 +202,7 @@ export function ChatInterface() {
 
               <div className='grid grid-cols-1 md:grid-cols-2 gap-3 max-w-lg mx-auto'>
                 {[
-                  'Compare spend across platforms?',
+                  'Is the campaign delivering within budget?',
                   'What was our total spend in Q4 2025?',
                   'CPM by platform',
                   'Daily spend trend for device level',
@@ -236,7 +236,7 @@ export function ChatInterface() {
                 <div className={`flex-1 space-y-3 ${message.role === 'user' ? 'text-right' : ''}`}>
                   {/* Message Content */}
                   <div
-                    className={`inline-block max-w-[95%] p-4 rounded-lg ${
+                    className={`inline-block max-w-[80%] p-4 rounded-lg ${
                       message.role === 'user'
                         ? 'bg-primary text-primary-foreground'
                         : 'bg-card border border-border'
@@ -322,7 +322,7 @@ export function ChatInterface() {
       </ScrollArea>
 
       {/* Input Area */}
-      <div className='sticky bottom-0 border-t border-border p-4 bg-card'>
+      <div className='border-t border-border p-4 bg-card'>
         <form onSubmit={handleSubmit} className='max-w-fit mx-auto flex gap-3'>
           <Input
             ref={inputRef}
