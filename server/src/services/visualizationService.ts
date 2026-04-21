@@ -77,47 +77,54 @@ class VisualizationService {
    */
   private detectChartType(data: any[], columns: ColumnMetadata[]): ChartType {
     const rowCount = data.length;
+
     const dateColumns = columns.filter(c =>
       c.type === 'DATE' || c.type === 'TIMESTAMP' ||
       (c.name.toLowerCase().includes('date') || c.name.toLowerCase().includes('time'))
     );
+
     const numericColumns = columns.filter(c =>
       c.type === 'INTEGER' || c.type === 'NUMERIC'
     );
+
     const stringColumns = columns.filter(c => c.type === 'STRING');
 
-    // Single value
+    // 1. Single value
     if (rowCount === 1 && numericColumns.length === 1) {
       return 'metric';
     }
 
-    // Time series
+    // 2. Time series (ADD AREA SUPPORT)
     if (dateColumns.length > 0 && numericColumns.length > 0) {
       if (numericColumns.length === 1) {
+        if (rowCount > 15) return 'area'; // ✅ NEW
         return 'line';
       }
       return 'combo';
     }
 
-    // Part-to-whole (categorical with single metric)
+    // 3. Stacked bar (ADD THIS BLOCK)
+    if (stringColumns.length >= 2 && numericColumns.length === 1) {
+      return 'stacked_bar'; // ✅ NEW
+    }
+
+    // 4. Pie / Donut (IMPROVE THIS)
     if (stringColumns.length === 1 && numericColumns.length === 1) {
-      if (rowCount <= 6) {
-        return 'donut';
-      }
+      if (rowCount <= 4) return 'pie';     // ✅ NEW
+      if (rowCount <= 8) return 'donut';   // UPDATED
       return 'bar';
     }
 
-    // Multiple metrics comparison
+    // 5. Grouped bar
     if (numericColumns.length >= 2 && stringColumns.length === 1) {
       return 'grouped_bar';
     }
 
-    // Single metric with categories
+    // 6. Default categorical
     if (numericColumns.length === 1 && stringColumns.length >= 1) {
       return 'bar';
     }
 
-    // Default to table for complex data
     return 'table';
   }
 
@@ -426,20 +433,50 @@ class VisualizationService {
     return /^-?\d+(\.\d+)?([eE][-+]?\d+)?$/.test(trimmed);
   }
 
+  private toNumber(value: any): number {
+    if (typeof value === 'number') return value;
+
+    if (typeof value === 'string') {
+      return Number(
+        value.replace(/[₹$£€,]/g, '')
+      );
+    }
+
+    return 0;
+  }
+
   /**
    * Transform data for specific chart types
    */
   transformDataForChart(data: any[], chartType: ChartType, config: ChartConfig): any[] {
-    switch (chartType) {
-      case 'funnel':
-        return this.transformForFunnel(data, config);
-      case 'heatmap':
-        return this.transformForHeatmap(data, config);
-      default:
-        return data;
-    }
-  }
 
+  // ✅ convert numeric strings to numbers
+  const parsed = data.map(row => {
+    const newRow: any = { ...row };
+
+    if (config.yAxis?.field) {
+      const field = config.yAxis.field;
+      newRow[field] = this.toNumber(row[field]);
+    }
+
+    if (config.series) {
+      config.series.forEach((s: { field: string }) => {
+        newRow[s.field] = this.toNumber(row[s.field]);
+      });
+    }
+
+    return newRow;
+  });
+
+  switch (chartType) {
+    case 'funnel':
+      return this.transformForFunnel(parsed, config);
+    case 'heatmap':
+      return this.transformForHeatmap(parsed, config);
+    default:
+      return parsed;
+  }
+}
   /**
    * Transform data for funnel chart
    */

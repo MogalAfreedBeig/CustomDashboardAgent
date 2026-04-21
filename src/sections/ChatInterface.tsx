@@ -155,7 +155,7 @@ export function ChatInterface() {
   return (
     <div className='h-screen flex flex-col bg-background'>
       {/* Header */}
-      <header className='h-16 border-b border-border flex items-center justify-between px-6 bg-card'>
+      <header className='min-h-16 border-b border-border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-4 sm:px-6 py-3 bg-card'>
         <div>
           <h2 className='font-semibold'>Analytics Bot Assistant</h2>
           <p className='text-xs text-muted-foreground'>
@@ -189,7 +189,7 @@ export function ChatInterface() {
 
       {/* Messages */}
       <ScrollArea className='flex-1 overflow-y-auto'>
-        <div className='p-6 w-full px-20 space-y-6'>
+        <div className='w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6'>
           {messages.length === 0 ? (
             <div className='text-center py-20'>
               <div className='w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6'>
@@ -236,7 +236,7 @@ export function ChatInterface() {
                 <div className={`flex-1 space-y-3 ${message.role === 'user' ? 'text-right' : ''}`}>
                   {/* Message Content */}
                   <div
-                    className={`inline-block max-w-[95%] p-4 rounded-lg ${
+                    className={`inline-block w-fit max-w-[85%] sm:max-w-[75%] lg:max-w-[65%] p-4 rounded-lg ${
                       message.role === 'user'
                         ? 'bg-primary text-primary-foreground'
                         : 'bg-card border border-border'
@@ -323,13 +323,13 @@ export function ChatInterface() {
 
       {/* Input Area */}
       <div className='sticky bottom-0 border-t border-border p-4 bg-card'>
-        <form onSubmit={handleSubmit} className='max-w-fit mx-auto flex gap-3'>
+        <form onSubmit={handleSubmit} className='w-full max-w-4xl lg:max-w-5xl mx-auto flex gap-2 sm:gap-3'>
           <Input
             ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder='Ask about your campaign performance...'
-            className='flex-1'
+            className='flex-1 h-10 sm:h-11'
             disabled={isLoading}
           />
           <Button type='submit' disabled={isLoading || !input.trim()}>

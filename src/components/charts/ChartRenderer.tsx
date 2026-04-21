@@ -334,7 +334,10 @@ export function ChartRenderer({ config, data }: ChartRendererProps) {
 
     const pieData = data.map((item) => ({
       name: item[xField],
-      value: item[yField],
+      value:
+        typeof item[yField] === "number"
+          ? item[yField]
+          : Number(String(item[yField]).replace(/,/g, "")),
     }));
 
     const isDonut = type === 'donut';
