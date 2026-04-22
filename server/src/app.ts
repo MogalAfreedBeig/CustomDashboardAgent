@@ -63,12 +63,12 @@ app.use('/apiv2/v1', routes);
 /* ======================
    Serve Frontend (Vite build)
 ====================== */
-const distPath = path.resolve(process.cwd(), 'dist');
+const distPath = path.join(__dirname, "../../../dist");
 
-app.use(express.static(distPath));
+app.use(express.static(distPath, { maxAge: "0" }));
 
-app.get(/^(?!\/apiv2\/).*/, (req, res) => {
-  res.sendFile(path.join(distPath, 'index.html'));
+app.get(/^(?!\/apiv2\/).*/, (_req, res) => {
+  res.sendFile(path.join(distPath, "index.html"));
 });
 
 /* ======================
