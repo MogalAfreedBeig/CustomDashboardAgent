@@ -63,12 +63,17 @@ app.use('/apiv2/v1', routes);
 /* ======================
    Serve Frontend (Vite build)
 ====================== */
-const distPath = path.join(__dirname, "../../../dist");
 
-app.use(express.static(distPath, { maxAge: "0" }));
+const distPath = path.resolve(__dirname, "../../../../dist");
 
+app.use(express.static(distPath));
+
+// favicon fix
+app.get("/favicon.ico", (_req, res) => res.status(204));
+
+// SPA fallback
 app.get(/^(?!\/apiv2\/).*/, (_req, res) => {
-  res.sendFile(path.join(distPath, "index.html"));
+  res.sendFile(path.join(distPath, 'index.html'));
 });
 
 /* ======================
