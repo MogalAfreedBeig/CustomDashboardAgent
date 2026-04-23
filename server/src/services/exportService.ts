@@ -121,6 +121,13 @@ class ExportService {
     }
   }
 
+  private PPT = {
+    left: 0.6,
+    top: 1.1,
+    width: 8.4,
+    height: 4.7
+  };
+
   /**
    * Export to PowerPoint
    */
@@ -212,7 +219,7 @@ class ExportService {
     slide.addText(content.title, {
       x: 0.5,
       y: 2,
-      w: 9,
+      w: 8.4,
       h: 1.5,
       fontSize: 36,
       bold: true,
@@ -224,7 +231,7 @@ class ExportService {
       slide.addText(content.subtitle, {
         x: 0.5,
         y: 3.5,
-        w: 9,
+        w: 8.4,
         h: 0.5,
         fontSize: 18,
         color: '666666',
@@ -236,7 +243,7 @@ class ExportService {
       slide.addText(content.date, {
         x: 0.5,
         y: 5,
-        w: 9,
+        w: 8.4,
         h: 0.3,
         fontSize: 12,
         color: '999999',
@@ -258,9 +265,9 @@ class ExportService {
     // HEADER TITLE (inside blue bar)
     slide.addText(content.title, {
       x: 0.5,
-      y: 0.18,
-      w: 9,
-      h: 0.4,
+      y: 0.2,
+      w: 8.4,
+      h: 0.5,
       fontSize: 18,
       bold: true,
       color: 'FFFFFF',
@@ -268,9 +275,9 @@ class ExportService {
 
     // BODY
     slide.addText(content.body, {
-      x: 0.5,
-      y: 1.0,
-      w: 9,
+      x: this.PPT.left,
+      y: this.PPT.top,
+      w: this.PPT.width,
       h: 5,
       fontSize: 14,
       color: '333333',
@@ -290,9 +297,9 @@ class ExportService {
     // HEADER TITLE
     slide.addText(content.title, {
       x: 0.5,
-      y: 0.18,
-      w: 9,
-      h: 0.4,
+      y: 0.2,
+      w: 8.4,
+      h: 0.5,
       fontSize: 18,
       bold: true,
       color: 'FFFFFF',
@@ -303,7 +310,7 @@ class ExportService {
       slide.addText('Chart data unavailable', {
         x: 0.5,
         y: 2.0,
-        w: 9,
+        w: 8.4,
         h: 0.5,
         fontSize: 14,
         color: '666666',
@@ -313,16 +320,22 @@ class ExportService {
     }
 
     const chartOptions: Record<string, unknown> = {
-      x: 0.5,
-      y: 1.0,
-      w: 9,
-      h: 5.2,
-      chartColors: content.chartConfig.config.colors?.map((c: string) =>
-        c.replace('#', '').slice(0, 6)
-      ),
-      showLegend: content.chartConfig.config.showLegend,
+      x: 1.0,
+      y: 1.2,
+      w: 7.5,
+      h: 4.2,
+      showLegend: true,
+      legendPos: 'r',
       showValue: true,
+      legendFontSize: 9,
+      dataLabelFontSize: 9
     };
+
+    if (content.chartConfig.type === 'pie' || content.chartConfig.type === 'donut') {
+      chartOptions.x = 1.8;
+      chartOptions.w = 5.8;
+      chartOptions.h = 4.3;
+    }
 
     if (content.chartConfig.type === 'stacked_bar') {
       chartOptions.barGrouping = 'stacked';
@@ -348,9 +361,9 @@ class ExportService {
     // HEADER TITLE
     slide.addText(content.title, {
       x: 0.5,
-      y: 0.18,
-      w: 9,
-      h: 0.4,
+      y: 0.2,
+      w: 8.4,
+      h: 0.5,
       fontSize: 18,
       bold: true,
       color: 'FFFFFF',
@@ -371,13 +384,17 @@ class ExportService {
     ];
 
     slide.addTable(tableData, {
-      x: 0.5,
-      y: 1.0,
-      w: 9,
-      h: 5.2,
-      fontSize: 10,
-      border: { type: 'solid', pt: 0.5, color: 'CCCCCC' },
-      colW: content.headers.map(() => 9 / content.headers.length),
+      x: this.PPT.left,
+      y: this.PPT.top,
+      w: this.PPT.width,
+      h: this.PPT.height,
+      fontSize: 9,
+      autoPage: true,
+      autoPageRepeatHeader: true,
+      border: { type: 'solid', pt: 0.25, color: 'CCCCCC' },
+      colW: Array(content.headers.length).fill(
+        this.PPT.width / content.headers.length
+      ),
     });
   }
 
@@ -394,9 +411,9 @@ class ExportService {
     // HEADER TITLE
     slide.addText(content.title, {
       x: 0.5,
-      y: 0.18,
-      w: 9,
-      h: 0.4,
+      y: 0.2,
+      w: 8.4,
+      h: 0.5,
       fontSize: 18,
       bold: true,
       color: 'FFFFFF',
@@ -409,7 +426,7 @@ class ExportService {
     slide.addText(insightsText, {
       x: 0.5,
       y: 1.0,
-      w: 9,
+      w: 8.4,
       h: 5,
       fontSize: 14,
       color: '333333',
