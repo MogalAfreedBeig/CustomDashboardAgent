@@ -84,14 +84,21 @@ export function ChartRenderer({ config, data }: ChartRendererProps) {
     const isNumeric = Number.isFinite(numericValue);
 
     if (format === 'currency' && isNumeric) {
-      return `$${numericValue.toLocaleString()}`;
+      return new Intl.NumberFormat('en-IN', {
+        style: 'currency',
+        currency: 'INR',
+        maximumFractionDigits: 2
+      }).format(numericValue);
     }
+
     if (format === 'percentage' && isNumeric) {
       return `${(numericValue * 100).toFixed(2)}%`;
     }
+
     if (isNumeric) {
-      return numericValue.toLocaleString();
+      return numericValue.toLocaleString('en-IN');
     }
+
     return value;
   };
 
