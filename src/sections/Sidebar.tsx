@@ -47,7 +47,8 @@ export function Sidebar({
   };
 
   const handleNavigate = () => {
-    const url = 'https://customdashboard.web.app';
+    // const url = 'https://customdashboard.web.app';
+    const url = 'https://customdashboard-dashboard-1013931710167.asia-south1.run.app/';
     const newWindow = window.open(url, '_blank');
     if (newWindow) newWindow.opener = null;
   };
