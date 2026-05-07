@@ -70,7 +70,7 @@ export function Sidebar({
       {/* Logo */}
       <div className='p-4 border-b border-border'>
         <div className='flex items-center gap-3'>
-          <div className='w-8 h-8 bg-gradient-to-br from-primary to-primary/60 rounded-lg flex items-center justify-center flex-shrink-0'>
+          <div className='w-8 h-8 bg-yellow-400 rounded-lg flex items-center justify-center flex-shrink-0'>
             <MessageSquare size={18} className='text-primary-foreground' />
           </div>
           {isOpen && (
@@ -88,8 +88,9 @@ export function Sidebar({
       <div className='p-3'>
         <Button
           onClick={handleNewChat}
-          className={`w-full ${isOpen ? '' : 'px-2'}`}
-          variant='default'
+          className={`w-full bg-yellow-400 hover:bg-yellow-500 text-black ${
+            isOpen ? '' : 'px-2'
+          }`}
         >
           <Plus size={18} className='flex-shrink-0' />
           {isOpen && <span className='ml-2'>New Chat</span>}
@@ -103,8 +104,8 @@ export function Sidebar({
             onClick={() => onViewChange('chat')}
             className={`w-full flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
               activeView === 'chat'
-                ? 'bg-primary/10 text-primary'
-                : 'hover:bg-muted text-muted-foreground'
+                ? 'bg-yellow-100 text-yellow-700'
+                : 'hover:bg-yellow-50 text-muted-foreground'
             }`}
           >
             <MessageSquare size={18} />
@@ -115,7 +116,7 @@ export function Sidebar({
             onClick={handleNavigate}
             className={`w-full flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
               activeView === 'dashboard'
-                ? 'bg-primary/10 text-primary'
+                ? 'bg-yellow/10 text-yellow'
                 : 'hover:bg-muted text-muted-foreground'
             }`}
           >
@@ -142,7 +143,7 @@ export function Sidebar({
                   key={conversation.id}
                   className={`flex items-center justify-between px-3 py-2 rounded-md text-sm transition-colors ${
                     currentConversationId === conversation.id
-                      ? 'bg-primary/10 text-primary'
+                      ? 'bg-yellow-100 text-yellow-700'
                       : 'hover:bg-muted text-muted-foreground'
                   }`}
                 >
@@ -188,7 +189,7 @@ export function Sidebar({
                 onClick={() => setTheme('light')}
                 className={`p-1.5 rounded ${
                   theme === 'light'
-                    ? 'bg-primary/20 text-primary'
+                    ? 'bg-yellow-100 text-yellow-700'
                     : 'text-muted-foreground'
                 }`}
               >
@@ -198,7 +199,7 @@ export function Sidebar({
                 onClick={() => setTheme('dark')}
                 className={`p-1.5 rounded ${
                   theme === 'dark'
-                    ? 'bg-primary/20 text-primary'
+                    ? 'bg-yellow-100 text-yellow-700'
                     : 'text-muted-foreground'
                 }`}
               >
@@ -208,7 +209,7 @@ export function Sidebar({
                 onClick={() => setTheme('system')}
                 className={`p-1.5 rounded ${
                   theme === 'system'
-                    ? 'bg-primary/20 text-primary'
+                    ? 'bg-yellow-100 text-yellow-700'
                     : 'text-muted-foreground'
                 }`}
               >
